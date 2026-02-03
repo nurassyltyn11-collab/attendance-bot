@@ -7,7 +7,7 @@ from datetime import datetime
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiohttp import web  # Тегін хостинг үшін керек
+from aiohttp import web
 
 # --- БАПТАУЛАР ---
 API_TOKEN = '7798122260:AAHpPh_J3OOgc0yY2f-6Wlbh0CNVgoTPZ9Q'
@@ -21,7 +21,6 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-# --- БАЗАМЕН ЖҰМЫС ---
 def init_db():
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
@@ -32,7 +31,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-# --- ВЕБ СЕРВЕР (Render/Railway ұйықтап қалмауы үшін) ---
+# Веб-сервер Render үшін
 async def handle(request):
     return web.Response(text="Бот жұмыс істеп тұр!")
 
@@ -41,13 +40,10 @@ async def start_web_server():
     app.router.add_get("/", handle)
     runner = web.AppRunner(app)
     await runner.setup()
-    # Хостинг беретін портты қолданады немесе 8080
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    logging.info(f"Веб-сервер {port} портында қосылды")
 
-# --- КОМАНДАЛАР ---
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     builder = ReplyKeyboardBuilder()
@@ -57,7 +53,7 @@ async def start_cmd(message: types.Message):
         builder.row(types.KeyboardButton(text=BTN_REPORT))
 
     await message.answer(
-        f"👋 Сәлем, {message.from_user.first_name}!\nБот іске қосылды.",
+        f"👋 Сәлем!\nБот интернетте іске қосылды.",
         reply_markup=builder.as_markup(resize_keyboard=True)
     )
 
@@ -103,15 +99,10 @@ async def send_report(message: types.Message):
     df.to_excel("report.xlsx", index=False)
     await message.answer_document(types.FSInputFile("report.xlsx"), caption="📅 Қатысу есебі")
 
-# --- НЕГІЗГІ ФУНКЦИЯ ---
 async def main():
     init_db()
-    # Веб-серверді ботпен қатар іске қосамыз
     await start_web_server()
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logging.info("Бот тоқтатылды")
+    asyncio.run(main())
