@@ -11,7 +11,7 @@ from aiohttp import web
 
 # --- БАПТАУЛАР ---
 API_TOKEN = '7798122260:AAHpPh_J3OOgc0yY2f-6Wlbh0CNVgoTPZ9Q'
-ADMIN_ID = 7951069138 
+ADMIN_ID = 6713005636 
 
 BTN_REG = "📝 Тіркелу / Өзгерту"
 BTN_MARK = "✅ Мен осындамын!"
@@ -158,4 +158,5 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
 
