@@ -62,7 +62,7 @@ async def start_cmd(message: types.Message):
 
 @dp.message(F.text == BTN_REG)
 async def register_info(message: types.Message):
-    await message.answer("Тіркелу немесе деректі өзгерту үшін мына үлгіде жазыңыз:\n\n`Аты Жөні | Топ` \n\nМысалы: `Айбек Амангелді | ИТ-22`")
+    await message.answer("Тіркелу немесе деректі өзгерту үшін мына үлгіде жазыңыз:\n\n`Аты Жөні | Топ` \n\nМысалы: `Айбек Амангелді | ПО - 2303`")
 
 @dp.message(lambda message: "|" in (message.text or ""))
 async def process_registration(message: types.Message):
@@ -158,3 +158,4 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
