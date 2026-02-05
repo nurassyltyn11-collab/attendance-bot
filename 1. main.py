@@ -31,7 +31,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Веб-сервер Render үшін
 async def handle(request):
     return web.Response(text="Бот жұмыс істеп тұр!")
 
@@ -51,17 +50,13 @@ async def start_cmd(message: types.Message):
     builder.row(types.KeyboardButton(text=BTN_MARK))
     if message.from_user.id == ADMIN_ID:
         builder.row(types.KeyboardButton(text=BTN_REPORT))
-
-    await message.answer(
-        f"👋 Сәлем!\nБот интернетте іске қосылды.",
-        reply_markup=builder.as_markup(resize_keyboard=True)
-    )
+    await message.answer(f"👋 Сәлем!\nБот жаңартылды және дайын.", reply_markup=builder.as_markup(resize_keyboard=True))
 
 @dp.message(F.text == BTN_REG)
 async def register_info(message: types.Message):
     await message.answer("Тіркелу үшін мына үлгіде жауап қайтар:\n\n**Аты Жөні | Топ**")
 
-@dp.message(lambda message: "|" in message.text)
+@dp.message(lambda message: "|" in (message.text or ""))
 async def process_registration(message: types.Message):
     data = message.text.split('|')
     if len(data) < 2: return
@@ -94,10 +89,22 @@ async def mark_attendance(message: types.Message):
 async def send_report(message: types.Message):
     if message.from_user.id != ADMIN_ID: return
     conn = sqlite3.connect('attendance.db')
-    df = pd.read_sql_query("SELECT users.full_name, users.student_group, attendance.date FROM attendance JOIN users ON attendance.user_id = users.user_id", conn)
+    # Күн бойынша сұрыптау (ORDER BY)
+    query = """
+        SELECT users.full_name as 'Аты-жөні', 
+               users.student_group as 'Топ', 
+               attendance.date as 'Күні' 
+        FROM attendance 
+        JOIN users ON attendance.user_id = users.user_id
+        ORDER BY attendance.date ASC
+    """
+    df = pd.read_sql_query(query, conn)
     conn.close()
-    df.to_excel("report.xlsx", index=False)
-    await message.answer_document(types.FSInputFile("report.xlsx"), caption="📅 Қатысу есебі")
+    if df.empty:
+        return await message.answer("📊 Есеп әлі бос.")
+    report_path = "report.xlsx"
+    df.to_excel(report_path, index=False)
+    await message.answer_document(types.FSInputFile(report_path), caption="📅 Реттелген қатысу есебі")
 
 async def main():
     init_db()
