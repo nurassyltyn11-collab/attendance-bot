@@ -84,24 +84,20 @@ async def register_info(message: types.Message):
 # ТІРКЕЛУДІ ТЕКСЕРУ (ВАЛИДАЦИЯ)
 @dp.message(lambda message: "|" in (message.text or "") or (len(message.text.split()) >= 1 and not message.text.startswith('/')))
 async def process_registration(message: types.Message):
-    # Егер пайдаланушы батырманы басса, бұл функцияны тоқтату
     if message.text in [BTN_REG, BTN_MARK, BTN_STATS, BTN_HELP, BTN_TODAY, BTN_REPORT]:
         return
 
     data = message.text.split('|')
     
-    # 1. Тексеру: '|' таңбасы бар ма (топ жазылған ба)?
     if len(data) < 2:
         return await message.answer("❌ **Тіркелу қатесі!**\n\nСіз топты жазуды ұмыттыңыз немесе '|' таңбасын қоймадыңыз.\n\nҮлгі: `Амангелді Айбек | ПО-2303`")
     
     full_name = data[0].strip()
     group_name = data[1].strip()
 
-    # 2. Тексеру: Аты-жөні кемінде екі сөзден тұра ма?
     if len(full_name.split()) < 2:
         return await message.answer("❌ **Тіркелу қатесі!**\n\nТегіңіз бен атыңызды толық жазыңыз.\n\nҮлгі: `Амангелді Айбек | ПО-2303`")
 
-    # 3. Тексеру: Топ атауы бос емес пе?
     if not group_name:
         return await message.answer("❌ **Тіркелу қатесі!**\n\nТоп атауын жазу міндетті.")
 
@@ -112,6 +108,7 @@ async def process_registration(message: types.Message):
     conn.close()
     await message.answer(f"✅ Мәліметтер сәтті сақталды:\n👤 **{full_name}**\n👥 Топ: **{group_name}**")
 
+# ✅ «МЕН ОСЫНДАМЫН» БАТЫРМАСЫН ӨҢДЕУ
 @dp.message(F.text == BTN_MARK)
 async def mark_attendance(message: types.Message):
     user_id = message.from_user.id
@@ -120,17 +117,26 @@ async def mark_attendance(message: types.Message):
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
     
+    # Пайдаланушының тіркелгенін тексеру
     cursor.execute("SELECT full_name FROM users WHERE user_id=?", (user_id,))
     user = cursor.fetchone()
-    if not user:
-        conn.close()
-        return await message.answer("❌ Сіз базада жоқсыз! Алдымен тіркеліңіз.")
     
+    if user is None:
+        # ЕГЕР ТІРКЕЛМЕГЕН БОЛСА, ОСЫ ЖАУАП ШЫҒАДЫ
+        conn.close()
+        return await message.answer(
+            "❌ **Кешіріңіз, сіз базада жоқсыз!**\n\n"
+            "Белгілену үшін алдымен тіркелуіңіз қажет.\n"
+            "«📝 Тіркелу / Өзгерту» батырмасын басып, нұсқаулықты орындаңыз."
+        )
+    
+    # Егер тіркелген болса, бүгін белгіленген-белгіленбегенін тексеру
     cursor.execute("SELECT * FROM attendance WHERE user_id=? AND date=?", (user_id, today))
     if cursor.fetchone():
         conn.close()
         return await message.answer("⚠️ Сіз бүгін белгіленіп қойғансыз!")
     
+    # Тіркеу
     cursor.execute("INSERT INTO attendance VALUES (?, ?)", (user_id, today))
     conn.commit()
     conn.close()
@@ -195,7 +201,7 @@ async def send_report(message: types.Message):
         return await message.answer("📊 Есеп бос.")
     path = "report.xlsx"
     df.to_excel(path, index=False)
-    await message.answer_document(types.FSInputFile(path), caption="📅 Толық есеп")
+    await message.answer_document(types.FSInputFile(path), caption="📅 Барлық уақыттағы толық есеп")
 
 async def main():
     init_db()
