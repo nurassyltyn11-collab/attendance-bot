@@ -31,7 +31,7 @@ def init_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS users 
                       (user_id INTEGER PRIMARY KEY, full_name TEXT, student_group TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS attendance 
-                      (user_id INTEGER, date TEXT, time TEXT)''')
+                      (user_id INTEGER, date TEXT)''')
     conn.commit()
     conn.close()
 
@@ -69,8 +69,7 @@ async def help_info(message: types.Message):
     await message.answer(
         "📖 **Ботты қолдану ережесі:**\n\n"
         "1. **Тіркелу:** `Тегі Аты | Топ` форматында жазыңыз.\n"
-        "2. **Белгілену:** Күнделікті сабаққа келгенде 'Мен осындамын' батырмасын басыңыз.\n"
-        "3. **Профиль:** Қатысу статистикасын көре аласыз."
+        "2. **Белгілену:** Күнделікті сабаққа келгенде 'Мен осындамын' батырмасын басыңыз."
     )
 
 @dp.message(F.text == BTN_REG)
@@ -81,14 +80,12 @@ async def register_info(message: types.Message):
 async def process_registration(message: types.Message):
     data = message.text.split('|')
     
-    # ТЕКСЕРУ (VALIDATION)
     if len(data) < 2:
         return await message.answer("❌ Қате формат! '|' таңбасын қолданыңыз.")
     
     full_name = data[0].strip()
     group_name = data[1].strip()
 
-    # Есім мен тектің бар-жоғын тексеру (минимум 2 сөз)
     if len(full_name.split()) < 2:
         return await message.answer("❌ Қате! Тегіңіз бен атыңызды толық жазыңыз (мысалы: `Амангелді Айбек`).")
 
@@ -97,14 +94,12 @@ async def process_registration(message: types.Message):
     cursor.execute("INSERT OR REPLACE INTO users VALUES (?, ?, ?)", (message.from_user.id, full_name, group_name))
     conn.commit()
     conn.close()
-    await message.answer(f"✅ Мәліметтер сәтті сақталды:\n👤 **{full_name}**\n👥 Топ: **{group_name}**")
+    await message.answer(f"✅ Мәліметтер сақталды: **{full_name}** ({group_name})")
 
 @dp.message(F.text == BTN_MARK)
 async def mark_attendance(message: types.Message):
     user_id = message.from_user.id
-    now = datetime.now()
-    today = now.strftime("%d.%m.%Y")
-    current_time = now.strftime("%H:%M:%S")
+    today = datetime.now().strftime("%d.%m.%Y")
     
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
@@ -120,25 +115,24 @@ async def mark_attendance(message: types.Message):
         conn.close()
         return await message.answer("⚠️ Сіз бүгін белгіленіп қойғансыз!")
     
-    cursor.execute("INSERT INTO attendance VALUES (?, ?, ?)", (user_id, today, current_time))
+    cursor.execute("INSERT INTO attendance VALUES (?, ?)", (user_id, today))
     conn.commit()
     conn.close()
-    await message.answer(f"📍 {user[0]}, қатысуыңыз сәтті тіркелді!\n⏰ Уақыты: {current_time} ✅")
+    await message.answer(f"📍 {user[0]}, қатысуыңыз сәтті тіркелді!\n📅 Күні: {today} ✅")
 
 @dp.message(F.text == BTN_STATS)
 async def show_stats(message: types.Message):
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
     
-    # Соңғы 5 келу уақытын алу
-    cursor.execute("SELECT date, time FROM attendance WHERE user_id=? ORDER BY date DESC LIMIT 5", (message.from_user.id,))
+    cursor.execute("SELECT date FROM attendance WHERE user_id=? ORDER BY date DESC LIMIT 5", (message.from_user.id,))
     history = cursor.fetchall()
     
     cursor.execute("SELECT COUNT(*) FROM attendance WHERE user_id=?", (message.from_user.id,))
     count = cursor.fetchone()[0]
     conn.close()
 
-    history_text = "\n".join([f"🔹 {h[0]} ({h[1]})" for h in history])
+    history_text = "\n".join([f"🔹 {h[0]}" for h in history])
     if not history_text: history_text = "Деректер жоқ"
 
     await message.answer(
@@ -155,7 +149,7 @@ async def admin_today(message: types.Message):
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT users.full_name, attendance.time FROM attendance 
+        SELECT users.full_name FROM attendance 
         JOIN users ON attendance.user_id = users.user_id 
         WHERE attendance.date = ?
     """, (today,))
@@ -167,7 +161,7 @@ async def admin_today(message: types.Message):
     else:
         text = f"📅 **Бүгін келгендер ({today}):**\n\n"
         for i, row in enumerate(rows, 1):
-            text += f"{i}. {row[0]} ({row[1]})\n"
+            text += f"{i}. {row[0]}\n"
         await message.answer(text)
 
 @dp.message(F.text == BTN_REPORT)
@@ -178,8 +172,7 @@ async def send_report(message: types.Message):
     query = """
         SELECT users.full_name as 'Студент', 
                users.student_group as 'Топ', 
-               attendance.date as 'Күні',
-               attendance.time as 'Уақыты'
+               attendance.date as 'Күні'
         FROM attendance 
         JOIN users ON attendance.user_id = users.user_id
         ORDER BY attendance.date ASC
@@ -192,7 +185,7 @@ async def send_report(message: types.Message):
     
     path = "report.xlsx"
     df.to_excel(path, index=False)
-    await message.answer_document(types.FSInputFile(path), caption="📅 Барлық уақыттағы есеп")
+    await message.answer_document(types.FSInputFile(path), caption="📅 Толық есеп")
 
 async def main():
     init_db()
@@ -201,5 +194,3 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-
-
