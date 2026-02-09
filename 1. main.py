@@ -81,33 +81,6 @@ async def register_info(message: types.Message):
         "⚠️ *Маңызды: Аты-жөніңіз бен топтың арасында '|' таңбасы болуы шарт!*"
     )
 
-# ТІРКЕЛУДІ ТЕКСЕРУ (ВАЛИДАЦИЯ)
-@dp.message(lambda message: "|" in (message.text or "") or (len(message.text.split()) >= 1 and not message.text.startswith('/')))
-async def process_registration(message: types.Message):
-    if message.text in [BTN_REG, BTN_MARK, BTN_STATS, BTN_HELP, BTN_TODAY, BTN_REPORT]:
-        return
-
-    data = message.text.split('|')
-    
-    if len(data) < 2:
-        return await message.answer("❌ **Тіркелу қатесі!**\n\nСіз топты жазуды ұмыттыңыз немесе '|' таңбасын қоймадыңыз.\n\nҮлгі: `Амангелді Айбек | ПО-2303`")
-    
-    full_name = data[0].strip()
-    group_name = data[1].strip()
-
-    if len(full_name.split()) < 2:
-        return await message.answer("❌ **Тіркелу қатесі!**\n\nТегіңіз бен атыңызды толық жазыңыз.\n\nҮлгі: `Амангелді Айбек | ПО-2303`")
-
-    if not group_name:
-        return await message.answer("❌ **Тіркелу қатесі!**\n\nТоп атауын жазу міндетті.")
-
-    conn = sqlite3.connect('attendance.db')
-    cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO users VALUES (?, ?, ?)", (message.from_user.id, full_name, group_name))
-    conn.commit()
-    conn.close()
-    await message.answer(f"✅ Мәліметтер сәтті сақталды:\n👤 **{full_name}**\n👥 Топ: **{group_name}**")
-
 # ✅ «МЕН ОСЫНДАМЫН» БАТЫРМАСЫН ӨҢДЕУ
 @dp.message(F.text == BTN_MARK)
 async def mark_attendance(message: types.Message):
@@ -116,50 +89,73 @@ async def mark_attendance(message: types.Message):
     
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
-    
-    # Пайдаланушының тіркелгенін тексеру
     cursor.execute("SELECT full_name FROM users WHERE user_id=?", (user_id,))
     user = cursor.fetchone()
     
     if user is None:
-        # ЕГЕР ТІРКЕЛМЕГЕН БОЛСА, ОСЫ ЖАУАП ШЫҒАДЫ
         conn.close()
-        return await message.answer(
-            "❌ **Кешіріңіз, сіз базада жоқсыз!**\n\n"
-            "Белгілену үшін алдымен тіркелуіңіз қажет.\n"
-            "«📝 Тіркелу / Өзгерту» батырмасын басып, нұсқаулықты орындаңыз."
-        )
+        return await message.answer("❌ **Кешіріңіз, сіз базада жоқсыз!**\n\nБелгілену үшін алдымен тіркелуіңіз қажет. «📝 Тіркелу / Өзгерту» батырмасын басыңыз.")
     
-    # Егер тіркелген болса, бүгін белгіленген-белгіленбегенін тексеру
     cursor.execute("SELECT * FROM attendance WHERE user_id=? AND date=?", (user_id, today))
     if cursor.fetchone():
         conn.close()
         return await message.answer("⚠️ Сіз бүгін белгіленіп қойғансыз!")
     
-    # Тіркеу
     cursor.execute("INSERT INTO attendance VALUES (?, ?)", (user_id, today))
     conn.commit()
     conn.close()
     await message.answer(f"📍 {user[0]}, қатысуыңыз сәтті тіркелді!\n📅 Күні: {today} ✅")
 
+# ✅ «МЕНІҢ ПРОФИЛІМ» БАТЫРМАСЫН ӨҢДЕУ
 @dp.message(F.text == BTN_STATS)
 async def show_stats(message: types.Message):
+    user_id = message.from_user.id
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT date FROM attendance WHERE user_id=? ORDER BY date DESC LIMIT 5", (message.from_user.id,))
+    
+    cursor.execute("SELECT full_name, student_group FROM users WHERE user_id=?", (user_id,))
+    user_data = cursor.fetchone()
+    
+    if user_data is None:
+        conn.close()
+        return await message.answer("❌ **Профиль табылмады!**\n\nСтатистиканы көру үшін алдымен тіркеліңіз.")
+
+    cursor.execute("SELECT date FROM attendance WHERE user_id=? ORDER BY date DESC LIMIT 5", (user_id,))
     history = cursor.fetchall()
-    cursor.execute("SELECT COUNT(*) FROM attendance WHERE user_id=?", (message.from_user.id,))
+    cursor.execute("SELECT COUNT(*) FROM attendance WHERE user_id=?", (user_id,))
     count = cursor.fetchone()[0]
     conn.close()
 
-    history_text = "\n".join([f"🔹 {h[0]}" for h in history])
-    if not history_text: history_text = "Деректер жоқ"
+    history_text = "\n".join([f"🔹 {h[0]}" for h in history]) if history else "Деректер жоқ"
 
     await message.answer(
-        f"📊 **Сіздің статистикаңыз:**\n\n"
+        f"👤 **Пайдаланушы:** {user_data[0]}\n"
+        f"👥 **Топ:** {user_data[1]}\n"
+        f"--- \n"
+        f"📊 **Статистика:**\n"
         f"✅ Жалпы қатысу саны: {count}\n"
         f"📅 **Соңғы белгіленулер:**\n{history_text}"
     )
+
+# ТІРКЕЛУДІ ӨҢДЕУ (ВАЛИДАЦИЯ)
+@dp.message(lambda message: "|" in (message.text or ""))
+async def process_registration(message: types.Message):
+    data = message.text.split('|')
+    if len(data) < 2:
+        return await message.answer("❌ **Тіркелу қатесі!**\n\nҮлгі: `Амангелді Айбек | ПО-2303`")
+    
+    full_name = data[0].strip()
+    group_name = data[1].strip()
+
+    if len(full_name.split()) < 2:
+        return await message.answer("❌ **Қате!** Аты-жөніңізді толық жазыңыз.")
+
+    conn = sqlite3.connect('attendance.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO users VALUES (?, ?, ?)", (message.from_user.id, full_name, group_name))
+    conn.commit()
+    conn.close()
+    await message.answer(f"✅ Сақталды:\n👤 **{full_name}**\n👥 Топ: **{group_name}**")
 
 @dp.message(F.text == BTN_TODAY)
 async def admin_today(message: types.Message):
@@ -201,7 +197,7 @@ async def send_report(message: types.Message):
         return await message.answer("📊 Есеп бос.")
     path = "report.xlsx"
     df.to_excel(path, index=False)
-    await message.answer_document(types.FSInputFile(path), caption="📅 Барлық уақыттағы толық есеп")
+    await message.answer_document(types.FSInputFile(path), caption="📅 Толық есеп")
 
 async def main():
     init_db()
@@ -210,4 +206,3 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-
