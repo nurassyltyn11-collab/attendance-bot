@@ -75,7 +75,7 @@ async def help_info(message: types.Message):
 
 @dp.message(F.text == BTN_REG)
 async def register_info(message: types.Message):
-    await message.answer("📝 Тіркелу үшін мына үлгіде хабарлама жіберіңіз:\n\n`Сыздыков Максим | ПО-2302` \n\n⚠️ *Ескерту: Тегіңіз бен атыңызды толық жазыңыз!*")
+    await message.answer("📝 Тіркелу үшін мына үлгіде хабарлама жіберіңіз:\n\n`Амангелді Айбек | ПО-2303` \n\n⚠️ *Ескерту: Тегіңіз бен атыңызды толық жазыңыз!*")
 
 @dp.message(lambda message: "|" in (message.text or ""))
 async def process_registration(message: types.Message):
@@ -201,4 +201,5 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
 
