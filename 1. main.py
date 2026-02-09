@@ -60,7 +60,7 @@ async def start_cmd(message: types.Message):
         builder.row(types.KeyboardButton(text=BTN_REPORT))
 
     await message.answer(
-        f"👋 Сәлем, {message.from_user.first_name}!\n\n🏫 **Attendance System**-ге қош келдіңіз. Бұл жерде сабаққа қатысуыңызды белгілей аласыз.",
+        f"👋 Сәлем, {message.from_user.first_name}!\n\n🏫 **Attendance System**-ге қош келдіңіз. Тіркелу үшін тиісті батырманы басыңыз.",
         reply_markup=builder.as_markup(resize_keyboard=True)
     )
 
@@ -68,33 +68,49 @@ async def start_cmd(message: types.Message):
 async def help_info(message: types.Message):
     await message.answer(
         "📖 **Ботты қолдану ережесі:**\n\n"
-        "1. **Тіркелу:** `Тегі Аты | Топ` форматында жазыңыз.\n"
-        "2. **Белгілену:** Күнделікті сабаққа келгенде 'Мен осындамын' батырмасын басыңыз."
+        "1. **Тіркелу:** Міндетті түрде `Тегі Аты | Топ` форматында жазыңыз.\n"
+        "2. **Белгілену:** Сабаққа келгенде 'Мен осындамын' батырмасын басыңыз.\n\n"
+        "⚠️ *Ескерту: Топсыз немесе тек есіммен тіркелу мүмкін емес!*"
     )
 
 @dp.message(F.text == BTN_REG)
 async def register_info(message: types.Message):
-    await message.answer("📝 Тіркелу үшін мына үлгіде хабарлама жіберіңіз:\n\n`Амангелді Айбек | ПО-2303` \n\n⚠️ *Ескерту: Тегіңіз бен атыңызды толық жазыңыз!*")
+    await message.answer(
+        "📝 **Тіркелу үшін хабарламаны мына үлгіде жіберіңіз:**\n\n"
+        "`Амангелді Айбек | ПО-2303` \n\n"
+        "⚠️ *Маңызды: Аты-жөніңіз бен топтың арасында '|' таңбасы болуы шарт!*"
+    )
 
-@dp.message(lambda message: "|" in (message.text or ""))
+# ТІРКЕЛУДІ ТЕКСЕРУ (ВАЛИДАЦИЯ)
+@dp.message(lambda message: "|" in (message.text or "") or (len(message.text.split()) >= 1 and not message.text.startswith('/')))
 async def process_registration(message: types.Message):
+    # Егер пайдаланушы батырманы басса, бұл функцияны тоқтату
+    if message.text in [BTN_REG, BTN_MARK, BTN_STATS, BTN_HELP, BTN_TODAY, BTN_REPORT]:
+        return
+
     data = message.text.split('|')
     
+    # 1. Тексеру: '|' таңбасы бар ма (топ жазылған ба)?
     if len(data) < 2:
-        return await message.answer("❌ Қате формат! '|' таңбасын қолданыңыз.")
+        return await message.answer("❌ **Тіркелу қатесі!**\n\nСіз топты жазуды ұмыттыңыз немесе '|' таңбасын қоймадыңыз.\n\nҮлгі: `Амангелді Айбек | ПО-2303`")
     
     full_name = data[0].strip()
     group_name = data[1].strip()
 
+    # 2. Тексеру: Аты-жөні кемінде екі сөзден тұра ма?
     if len(full_name.split()) < 2:
-        return await message.answer("❌ Қате! Тегіңіз бен атыңызды толық жазыңыз (мысалы: `Амангелді Айбек`).")
+        return await message.answer("❌ **Тіркелу қатесі!**\n\nТегіңіз бен атыңызды толық жазыңыз.\n\nҮлгі: `Амангелді Айбек | ПО-2303`")
+
+    # 3. Тексеру: Топ атауы бос емес пе?
+    if not group_name:
+        return await message.answer("❌ **Тіркелу қатесі!**\n\nТоп атауын жазу міндетті.")
 
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO users VALUES (?, ?, ?)", (message.from_user.id, full_name, group_name))
     conn.commit()
     conn.close()
-    await message.answer(f"✅ Мәліметтер сақталды: **{full_name}** ({group_name})")
+    await message.answer(f"✅ Мәліметтер сәтті сақталды:\n👤 **{full_name}**\n👥 Топ: **{group_name}**")
 
 @dp.message(F.text == BTN_MARK)
 async def mark_attendance(message: types.Message):
@@ -124,10 +140,8 @@ async def mark_attendance(message: types.Message):
 async def show_stats(message: types.Message):
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
-    
     cursor.execute("SELECT date FROM attendance WHERE user_id=? ORDER BY date DESC LIMIT 5", (message.from_user.id,))
     history = cursor.fetchall()
-    
     cursor.execute("SELECT COUNT(*) FROM attendance WHERE user_id=?", (message.from_user.id,))
     count = cursor.fetchone()[0]
     conn.close()
@@ -144,7 +158,6 @@ async def show_stats(message: types.Message):
 @dp.message(F.text == BTN_TODAY)
 async def admin_today(message: types.Message):
     if message.from_user.id not in ADMIN_ID: return
-    
     today = datetime.now().strftime("%d.%m.%Y")
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
@@ -167,7 +180,6 @@ async def admin_today(message: types.Message):
 @dp.message(F.text == BTN_REPORT)
 async def send_report(message: types.Message):
     if message.from_user.id not in ADMIN_ID: return
-    
     conn = sqlite3.connect('attendance.db')
     query = """
         SELECT users.full_name as 'Студент', 
@@ -179,10 +191,8 @@ async def send_report(message: types.Message):
     """
     df = pd.read_sql_query(query, conn)
     conn.close()
-    
     if df.empty:
         return await message.answer("📊 Есеп бос.")
-    
     path = "report.xlsx"
     df.to_excel(path, index=False)
     await message.answer_document(types.FSInputFile(path), caption="📅 Толық есеп")
