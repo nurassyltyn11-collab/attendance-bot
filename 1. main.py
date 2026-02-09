@@ -90,7 +90,7 @@ async def process_registration(message: types.Message):
 
     # Есім мен тектің бар-жоғын тексеру (минимум 2 сөз)
     if len(full_name.split()) < 2:
-        return await message.answer("❌ Қате! Тегіңіз бен атыңызды толық жазыңыз (мысалы: `Сыздыков Максим`).")
+        return await message.answer("❌ Қате! Тегіңіз бен атыңызды толық жазыңыз (мысалы: `Амангелді Айбек`).")
 
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
@@ -201,3 +201,4 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
