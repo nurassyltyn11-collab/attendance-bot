@@ -15,7 +15,7 @@ ADMIN_ID = [7951069138, 6713005636]
 
 BTN_REG = "📝 Тіркелу / Өзгерту"
 BTN_MARK = "✅ Мен осындамын!"
-BTN_STATS = "👤 Менің профилім"
+BTN_STATS = "📊 Менің сабаққа қатысуларым"  # Атауы өзгертілді
 BTN_HELP = "❓ Көмек / Нұсқаулық"
 BTN_TODAY = "📋 Бүгінгі тізім (Админ)"
 BTN_REPORT = "📊 Есеп (Excel)"
@@ -60,7 +60,7 @@ async def start_cmd(message: types.Message):
         builder.row(types.KeyboardButton(text=BTN_REPORT))
 
     await message.answer(
-        f"👋 Сәлем, {message.from_user.first_name}!\n\n🏫 **Attendance System**-ге қош келдіңіз. Тіркелу үшін тиісті батырманы басыңыз.",
+        f"👋 Сәлем, {message.from_user.first_name}!\n\n🏫 **Attendance System**-ге қош келдіңіз.",
         reply_markup=builder.as_markup(resize_keyboard=True)
     )
 
@@ -69,8 +69,8 @@ async def help_info(message: types.Message):
     await message.answer(
         "📖 **Ботты қолдану ережесі:**\n\n"
         "1. **Тіркелу:** Міндетті түрде `Тегі Аты | Топ` форматында жазыңыз.\n"
-        "2. **Белгілену:** Сабаққа келгенде 'Мен осындамын' батырмасын басыңыз.\n\n"
-        "⚠️ *Ескерту: Топсыз немесе тек есіммен тіркелу мүмкін емес!*"
+        "2. **Белгілену:** Сабаққа келгенде 'Мен осындамын' батырмасын басыңыз.\n"
+        "3. **Қатысулар:** Барлық белгіленген күндеріңізді көру үшін 'Менің сабаққа қатысуларым' батырмасын басыңыз."
     )
 
 @dp.message(F.text == BTN_REG)
@@ -78,10 +78,10 @@ async def register_info(message: types.Message):
     await message.answer(
         "📝 **Тіркелу үшін хабарламаны мына үлгіде жіберіңіз:**\n\n"
         "`Амангелді Айбек | ПО-2303` \n\n"
-        "⚠️ *Маңызды: Аты-жөніңіз бен топтың арасында '|' таңбасы болуы шарт!*"
+        "⚠️ *Аты-жөніңіз бен топтың арасында '|' таңбасы болуы шарт!*"
     )
 
-# ✅ «МЕН ОСЫНДАМЫН» БАТЫРМАСЫН ӨҢДЕУ
+# ✅ «МЕН ОСЫНДАМЫН» БАТЫРМАСЫ
 @dp.message(F.text == BTN_MARK)
 async def mark_attendance(message: types.Message):
     user_id = message.from_user.id
@@ -106,57 +106,53 @@ async def mark_attendance(message: types.Message):
     conn.close()
     await message.answer(f"📍 {user[0]}, қатысуыңыз сәтті тіркелді!\n📅 Күні: {today} ✅")
 
-# ✅ «МЕНІҢ ПРОФИЛІМ» БАТЫРМАСЫН ӨҢДЕУ
+# ✅ «МЕНІҢ САБАҚҚА ҚАТЫСУЛАРЫМ» БАТЫРМАСЫ
 @dp.message(F.text == BTN_STATS)
 async def show_stats(message: types.Message):
     user_id = message.from_user.id
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
     
-    cursor.execute("SELECT full_name, student_group FROM users WHERE user_id=?", (user_id,))
+    cursor.execute("SELECT full_name FROM users WHERE user_id=?", (user_id,))
     user_data = cursor.fetchone()
     
     if user_data is None:
         conn.close()
-        return await message.answer("❌ **Профиль табылмады!**\n\nСтатистиканы көру үшін алдымен тіркеліңіз.")
+        return await message.answer("❌ **Сіз әлі тіркелмегенсіз!**\n\nҚатысу тарихын көру үшін алдымен тіркелу қажет.")
 
-    cursor.execute("SELECT date FROM attendance WHERE user_id=? ORDER BY date DESC LIMIT 5", (user_id,))
+    cursor.execute("SELECT date FROM attendance WHERE user_id=? ORDER BY date DESC", (user_id,))
     history = cursor.fetchall()
-    cursor.execute("SELECT COUNT(*) FROM attendance WHERE user_id=?", (user_id,))
-    count = cursor.fetchone()[0]
     conn.close()
 
-    history_text = "\n".join([f"🔹 {h[0]}" for h in history]) if history else "Деректер жоқ"
+    if not history:
+        await message.answer(f"👤 **{user_data[0]}**, сізде әлі белгіленген күндер жоқ.")
+    else:
+        history_text = "\n".join([f"✅ {h[0]}" for h in history])
+        await message.answer(f"📊 **Сіздің қатысу тарихыңыз ({len(history)} рет):**\n\n{history_text}")
 
-    await message.answer(
-        f"👤 **Пайдаланушы:** {user_data[0]}\n"
-        f"👥 **Топ:** {user_data[1]}\n"
-        f"--- \n"
-        f"📊 **Статистика:**\n"
-        f"✅ Жалпы қатысу саны: {count}\n"
-        f"📅 **Соңғы белгіленулер:**\n{history_text}"
-    )
-
-# ТІРКЕЛУДІ ӨҢДЕУ (ВАЛИДАЦИЯ)
+# ТІРКЕЛУДІ ӨҢДЕУ
 @dp.message(lambda message: "|" in (message.text or ""))
 async def process_registration(message: types.Message):
+    if message.text.startswith('/'): return
+    
     data = message.text.split('|')
     if len(data) < 2:
-        return await message.answer("❌ **Тіркелу қатесі!**\n\nҮлгі: `Амангелді Айбек | ПО-2303`")
+        return await message.answer("❌ **Қате!** Үлгі: `Аты Жөні | Топ`")
     
     full_name = data[0].strip()
     group_name = data[1].strip()
 
     if len(full_name.split()) < 2:
-        return await message.answer("❌ **Қате!** Аты-жөніңізді толық жазыңыз.")
+        return await message.answer("❌ **Қате!** Тегіңіз бен атыңызды толық жазыңыз.")
 
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO users VALUES (?, ?, ?)", (message.from_user.id, full_name, group_name))
     conn.commit()
     conn.close()
-    await message.answer(f"✅ Сақталды:\n👤 **{full_name}**\n👥 Топ: **{group_name}**")
+    await message.answer(f"✅ Мәліметтер сақталды!\n👤 **{full_name}**\n👥 Топ: **{group_name}**")
 
+# --- АДМИН ПАНЕЛЬ ---
 @dp.message(F.text == BTN_TODAY)
 async def admin_today(message: types.Message):
     if message.from_user.id not in ADMIN_ID: return
@@ -164,7 +160,7 @@ async def admin_today(message: types.Message):
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT users.full_name FROM attendance 
+        SELECT users.full_name, users.student_group FROM attendance 
         JOIN users ON attendance.user_id = users.user_id 
         WHERE attendance.date = ?
     """, (today,))
@@ -176,25 +172,20 @@ async def admin_today(message: types.Message):
     else:
         text = f"📅 **Бүгін келгендер ({today}):**\n\n"
         for i, row in enumerate(rows, 1):
-            text += f"{i}. {row[0]}\n"
+            text += f"{i}. {row[0]} ({row[1]})\n"
         await message.answer(text)
 
 @dp.message(F.text == BTN_REPORT)
 async def send_report(message: types.Message):
     if message.from_user.id not in ADMIN_ID: return
     conn = sqlite3.connect('attendance.db')
-    query = """
-        SELECT users.full_name as 'Студент', 
-               users.student_group as 'Топ', 
-               attendance.date as 'Күні'
-        FROM attendance 
-        JOIN users ON attendance.user_id = users.user_id
-        ORDER BY attendance.date ASC
-    """
+    query = "SELECT users.full_name as 'Студент', users.student_group as 'Топ', attendance.date as 'Күні' FROM attendance JOIN users ON attendance.user_id = users.user_id ORDER BY attendance.date ASC"
     df = pd.read_sql_query(query, conn)
     conn.close()
+    
     if df.empty:
         return await message.answer("📊 Есеп бос.")
+    
     path = "report.xlsx"
     df.to_excel(path, index=False)
     await message.answer_document(types.FSInputFile(path), caption="📅 Толық есеп")
