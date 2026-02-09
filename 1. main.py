@@ -11,6 +11,7 @@ from aiohttp import web
 
 # --- БАПТАУЛАР ---
 API_TOKEN = '7798122260:AAHpPh_J3OOgc0yY2f-6Wlbh0CNVgoTPZ9Q'
+# Админдер тізімі (ID-лер дұрыс форматта)
 ADMIN_ID = [7951069138, 6713005636]
 
 BTN_REG = "📝 Тіркелу / Өзгерту"
@@ -51,7 +52,8 @@ async def start_cmd(message: types.Message):
     builder.row(types.KeyboardButton(text=BTN_REG), types.KeyboardButton(text=BTN_MARK))
     builder.row(types.KeyboardButton(text=BTN_STATS))
     
-    if message.from_user.id == ADMIN_ID:
+    # Тексеру: Пайдаланушы ID-і тізімде бар ма?
+    if message.from_user.id in ADMIN_ID:
         builder.row(types.KeyboardButton(text=BTN_TODAY))
         builder.row(types.KeyboardButton(text=BTN_REPORT))
 
@@ -89,7 +91,6 @@ async def mark_attendance(message: types.Message):
         conn.close()
         return await message.answer("❌ Алдымен тіркеліңіз!")
     
-    # Бүгін белгіленіп қойған ба?
     cursor.execute("SELECT * FROM attendance WHERE user_id=? AND date=?", (user_id, today))
     if cursor.fetchone():
         conn.close()
@@ -111,7 +112,8 @@ async def show_stats(message: types.Message):
 
 @dp.message(F.text == BTN_TODAY)
 async def admin_today(message: types.Message):
-    if message.from_user.id != ADMIN_ID: return
+    if message.from_user.id not in ADMIN_ID: return
+    
     today = datetime.now().strftime("%d.%m.%Y")
     conn = sqlite3.connect('attendance.db')
     cursor = conn.cursor()
@@ -133,7 +135,8 @@ async def admin_today(message: types.Message):
 
 @dp.message(F.text == BTN_REPORT)
 async def send_report(message: types.Message):
-    if message.from_user.id != ADMIN_ID: return
+    if message.from_user.id not in ADMIN_ID: return
+    
     conn = sqlite3.connect('attendance.db')
     query = """
         SELECT users.full_name as 'Студент', 
@@ -145,8 +148,10 @@ async def send_report(message: types.Message):
     """
     df = pd.read_sql_query(query, conn)
     conn.close()
+    
     if df.empty:
         return await message.answer("📊 Есеп бос.")
+    
     path = "report.xlsx"
     df.to_excel(path, index=False)
     await message.answer_document(types.FSInputFile(path), caption="📅 Толық есеп")
