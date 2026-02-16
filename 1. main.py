@@ -115,7 +115,7 @@ async def send_report(message: types.Message):
 # 2. ПАЙДАЛАНУШЫ БАТЫРМАЛАРЫ
 @dp.message(F.text == BTN_HELP)
 async def help_info(message: types.Message):
-    await message.answer("📖 **Үлгі:** `Тегі Аты | Топ` \n\nМысалы: `Ахметов Әли | ПО-2401` \nБелгілену үшін 'Мен осындамын!' батырмасын басыңыз.")
+    await message.answer("📖 **Үлгі:** `Тегі Аты | Топ` \n\nМысалы: `Амангелді Айбек | ПО-2303` \nБелгілену үшін 'Мен осындамын!' батырмасын басыңыз.")
 
 @dp.message(F.text == BTN_REG)
 async def register_info(message: types.Message):
@@ -197,4 +197,5 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
 
