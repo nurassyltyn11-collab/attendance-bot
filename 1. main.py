@@ -10,7 +10,8 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiohttp import web
 
 # --- БАПТАУЛАР ---
-API_TOKEN = '7798122260:AAHNZW0NI5fp6stPMCLp7EIgxGqq3jrKvCg'
+# ЖАҢАРТЫЛҒАН ТОКЕН (REVOKED)
+API_TOKEN = '7798122260:AAGYqEkLCk53Un6Mm3KT9_PMIZO-Ob0F8mc'
 ADMIN_ID = [7951069138, 6713005636]
 
 BTN_REG = "📝 Тіркелу / Өзгерту"
@@ -44,11 +45,12 @@ async def start_web_server():
     app.router.add_get("/", handle)
     runner = web.AppRunner(app)
     await runner.setup()
+    # Render үшін стандартты портты немесе 8080 қолдану
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
 
-# --- БОТ ЛОГИКАСЫ (HANDLER ORDER MATTERS) ---
+# --- БОТ ЛОГИКАСЫ ---
 
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
@@ -64,7 +66,6 @@ async def start_cmd(message: types.Message):
         reply_markup=builder.as_markup(resize_keyboard=True)
     )
 
-# 1. АДМИН БАТЫРМАЛАРЫ (БІРІНШІ ТҰРУЫ КЕРЕК)
 @dp.message(F.text == BTN_TODAY)
 async def admin_today(message: types.Message):
     if message.from_user.id not in ADMIN_ID:
@@ -112,7 +113,6 @@ async def send_report(message: types.Message):
     df.to_excel(path, index=False)
     await message.answer_document(types.FSInputFile(path), caption="📅 Барлық уақыттағы толық есеп")
 
-# 2. ПАЙДАЛАНУШЫ БАТЫРМАЛАРЫ
 @dp.message(F.text == BTN_HELP)
 async def help_info(message: types.Message):
     await message.answer("📖 **Үлгі:** `Тегі Аты | Топ` \n\nМысалы: `Амангелді Айбек | ПО-2303` \nБелгілену үшін 'Мен осындамын!' батырмасын басыңыз.")
@@ -161,7 +161,6 @@ async def show_stats(message: types.Message):
     history_text = "\n".join([f"✅ {h[0]}" for h in history]) if history else "Белгіленулер жоқ."
     await message.answer(f"📊 **{user[0]}** қатысу тарихы:\n\n{history_text}")
 
-# 3. ТІРКЕЛУ ЖӘНЕ КЕЗ КЕЛГЕН МӘТІНДІ ӨҢДЕУ (ЕҢ СОҢЫНДА)
 @dp.message(F.text)
 async def handle_registration(message: types.Message):
     if "|" in message.text:
@@ -185,18 +184,26 @@ async def handle_registration(message: types.Message):
         conn.close()
         await message.answer(f"✅ Тіркелдіңіз: {full_name} ({group_name})")
     else:
-        # Егер пайдаланушы батырма емес, кез келген басқа нәрсе жазса
         await message.answer(
             "❓ Түсінбедім. Егер тіркелгіңіз келсе, мына үлгіде жазыңыз:\n\n`Тегі Аты | Топ` \n\nМысалы: `Амангелді Айбек | ПО-2303`"
         )
 
+# --- НЕГІЗГІ ІСКЕ ҚОСУ ФУНКЦИЯСЫ ---
 async def main():
     init_db()
+    
+    # 1. Ескі Webhook-ты өшіру және жиналып қалған хабарламаларды тазалау
+    # Бұл Conflict қатесін болдырмаудың ең сенімді жолы
+    await bot.delete_webhook(drop_pending_updates=True)
+    
+    # 2. Веб-серверді іске қосу (Render ұйықтап қалмауы үшін)
     await start_web_server()
+    
+    # 3. Ботты Polling режимінде қосу
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
-    asyncio.run(main())
-
-
-
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logging.info("Бот тоқтатылды")
