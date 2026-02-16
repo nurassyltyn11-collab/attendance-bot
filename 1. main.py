@@ -10,7 +10,7 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiohttp import web
 
 # --- БАПТАУЛАР ---
-API_TOKEN = '7798122260:AAH0FlGe3cNKFyt5yJ-VHD1CaTR1NDRnoIs'
+API_TOKEN = '7798122260:AAHNZW0NI5fp6stPMCLp7EIgxGqq3jrKvCg'
 ADMIN_ID = [7951069138, 6713005636]
 
 BTN_REG = "📝 Тіркелу / Өзгерту"
@@ -197,5 +197,6 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
 
 
